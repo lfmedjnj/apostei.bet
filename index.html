@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apostei.bet — Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Apostei<span>.bet</span></div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="dashboard">Dashboard</button>
+      <button class="tab" data-tab="tab2" disabled>Tab 2</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- TAB 1: DASHBOARD -->
+    <section id="dashboard" class="tab-panel active">
+
+      <!-- BASELINE -->
+      <div class="section-header">
+        <h2>Baseline <span class="tag">BP Meta</span> <span class="tag" id="month-tag">M0</span></h2>
+        <div class="header-actions">
+          <p class="muted">Valores do Business Plan para o mês selecionado.</p>
+          <select id="month-select" class="month-select"></select>
+        </div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-label">Retenção M0 → M1</div><div class="kpi-value" id="b-r1">—</div></div>
+        <div class="kpi"><div class="kpi-label">Retenção M1 → M2</div><div class="kpi-value" id="b-r2">—</div></div>
+        <div class="kpi"><div class="kpi-label">Retenção M3+</div><div class="kpi-value" id="b-r3">—</div></div>
+        <div class="kpi"><div class="kpi-label">GGR / Depósito</div><div class="kpi-value" id="b-ggr">—</div></div>
+        <div class="kpi"><div class="kpi-label">ROAS Depósito M0</div><div class="kpi-value" id="b-roas">—</div></div>
+      </div>
+
+      <!-- SCENARIO -->
+      <div class="section-header">
+        <h2>Cenário Editável</h2>
+        <div class="header-actions">
+          <p class="muted">Ajuste os 5 levers — o GGR projetado recalcula em tempo real.</p>
+          <button id="reset-btn" class="btn-ghost">↺ Reset</button>
+        </div>
+      </div>
+      <div class="kpi-grid editable">
+        <div class="kpi edit">
+          <div class="kpi-label">Retenção M0 → M1</div>
+          <div class="kpi-input"><input type="number" id="s-r1" step="0.5" min="0" max="100" /><span>%</span></div>
+        </div>
+        <div class="kpi edit">
+          <div class="kpi-label">Retenção M1 → M2</div>
+          <div class="kpi-input"><input type="number" id="s-r2" step="0.5" min="0" max="100" /><span>%</span></div>
+        </div>
+        <div class="kpi edit">
+          <div class="kpi-label">Retenção M3+</div>
+          <div class="kpi-input"><input type="number" id="s-r3" step="0.5" min="0" max="100" /><span>%</span></div>
+        </div>
+        <div class="kpi edit">
+          <div class="kpi-label">GGR / Depósito</div>
+          <div class="kpi-input"><input type="number" id="s-ggr" step="0.1" min="0" max="100" /><span>%</span></div>
+        </div>
+        <div class="kpi edit">
+          <div class="kpi-label">ROAS Depósito M0</div>
+          <div class="kpi-input"><input type="number" id="s-roas" step="0.05" min="0" /><span>x</span></div>
+        </div>
+      </div>
+
+      <!-- GGR TREND -->
+      <div class="section-header">
+        <h2>GGR Trend <span class="tag">Cenário vs Baseline</span></h2>
+      </div>
+      <div class="trend-card">
+        <div class="trend-stats">
+          <div>
+            <div class="trend-label" id="ggr-base-label">GGR M0 — Baseline</div>
+            <div class="trend-value" id="ggr-base">—</div>
+          </div>
+          <div>
+            <div class="trend-label" id="ggr-scen-label">GGR M0 — Cenário</div>
+            <div class="trend-value highlight" id="ggr-scen">—</div>
+          </div>
+          <div>
+            <div class="trend-label">Δ vs Baseline</div>
+            <div class="trend-value" id="ggr-delta">—</div>
+          </div>
+          <div>
+            <div class="trend-label" id="ggr-acc-label">Acumulado até M0</div>
+            <div class="trend-value" id="ggr-acc">—</div>
+          </div>
+        </div>
+        <div class="trend-chart"><canvas id="trendChart"></canvas></div>
+      </div>
+
+      <!-- 3-MONTH ROLLING ESTIMATE -->
+      <div class="section-header">
+        <h2>3 Months Rolling <span class="tag" id="rolling-tag">M0 → M2</span></h2>
+        <p class="muted">GGR projetado vs plano. Edite a linha "Latest Estimate" para simular um miss.</p>
+      </div>
+      <div class="table-card">
+        <table id="rolling-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th id="roll-h1">M0</th>
+              <th id="roll-h2">M1</th>
+              <th id="roll-h3">M2</th>
+              <th class="total-col">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="row-baseline">
+              <td>Baseline</td>
+              <td id="b-m1">—</td>
+              <td id="b-m2">—</td>
+              <td id="b-m3">—</td>
+              <td class="total-col" id="b-total">—</td>
+            </tr>
+            <tr class="row-estimate">
+              <td>Latest Estimate</td>
+              <td id="e-m1">—</td>
+              <td id="e-m2">—</td>
+              <td id="e-m3">—</td>
+              <td class="total-col" id="e-total">—</td>
+            </tr>
+            <tr class="row-delta">
+              <td>Δ vs Baseline</td>
+              <td id="d-m1">—</td>
+              <td id="d-m2">—</td>
+              <td id="d-m3">—</td>
+              <td class="total-col" id="d-total">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+    <section id="tab2" class="tab-panel">
+      <p class="muted">Tab 2 em definição.</p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
