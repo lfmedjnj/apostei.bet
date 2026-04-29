@@ -11,7 +11,7 @@
     <div class="brand">Apostei<span>.bet</span></div>
     <nav class="tabs">
       <button class="tab active" data-tab="dashboard">Dashboard</button>
-      <button class="tab" data-tab="tab2" disabled>Tab 2</button>
+      <button class="tab" data-tab="tab2">FAROL</button>
     </nav>
   </header>
 
@@ -141,13 +141,38 @@
 
     </section>
 
+    <!-- TAB 2: FAROL -->
     <section id="tab2" class="tab-panel">
-      <p class="muted">Tab 2 em definição.</p>
+      <div class="farol-filters">
+        <div class="filter">
+          <label>Marca</label>
+          <select disabled><option>Apostei.bet</option></select>
+        </div>
+        <div class="filter">
+          <label>Período</label>
+          <select disabled><option>MTD (Mês)</option><option>WTD (Semana)</option><option>D-1 (Dia)</option></select>
+        </div>
+        <div class="filter">
+          <label>Canal</label>
+          <select disabled><option>Todos</option></select>
+        </div>
+        <div class="filter">
+          <label>Campanha</label>
+          <select disabled><option>Todas</option></select>
+        </div>
+        <div class="filter">
+          <label>Indicador</label>
+          <select disabled><option>Todos</option></select>
+        </div>
+      </div>
+
+      <div id="farol-sections"></div>
     </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="data.js"></script>
+  <script src="farol_data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

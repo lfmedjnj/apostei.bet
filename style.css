@@ -295,6 +295,127 @@ main { padding: 32px; max-width: 100%; margin: 0; }
 #rolling-table tbody input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 #rolling-table tbody input { -moz-appearance: textfield; }
 
+/* ====== FAROL (TAB 2) ====== */
+.farol-filters {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+.filter { display: flex; flex-direction: column; gap: 6px; }
+.filter label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.filter select {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+.filter select:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.farol-section {
+  margin-bottom: 28px;
+}
+.farol-section-header {
+  margin-bottom: 12px;
+}
+.farol-section-header h3 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+.farol-section-header .sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.farol-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.farol-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-left: 3px solid var(--border-strong);
+  transition: border-color 0.15s;
+}
+.farol-tile.green { border-left-color: var(--positive); }
+.farol-tile.yellow { border-left-color: #fbbf24; }
+.farol-tile.red { border-left-color: var(--negative); }
+.farol-tile.neutral { border-left-color: var(--border-strong); }
+
+.farol-tile .name {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.farol-tile .atual {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.farol-tile .meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.farol-tile .meta span { display: flex; justify-content: space-between; }
+.farol-tile .meta b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+.farol-tile .ating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 8px;
+  border-radius: 4px;
+  align-self: flex-start;
+  background: var(--surface-2);
+}
+.farol-tile.green .ating { color: var(--positive); }
+.farol-tile.yellow .ating { color: #fbbf24; }
+.farol-tile.red .ating { color: var(--negative); }
+.farol-tile .ating .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.farol-tile.green .ating .dot { background: var(--positive); }
+.farol-tile.yellow .ating .dot { background: #fbbf24; }
+.farol-tile.red .ating .dot { background: var(--negative); }
+.farol-tile.neutral .ating .dot { background: var(--text-muted); }
+
 /* RESPONSIVE */
 @media (max-width: 1024px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }

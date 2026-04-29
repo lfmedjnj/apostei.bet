@@ -276,6 +276,58 @@ function update() {
   }
 }
 
+// ===== FAROL (TAB 2) =====
+function fmtKpi(value, type) {
+  if (value === null || value === undefined) return '—';
+  if (type === 'brl') return fmtBRL(value);
+  if (type === 'pct') return (value * 100).toFixed(1) + '%';
+  if (type === 'x')   return value.toFixed(2) + 'x';
+  if (type === 'qty') {
+    if (Math.abs(value) >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+    if (Math.abs(value) >= 1e3) return (value / 1e3).toFixed(0) + 'K';
+    return Math.round(value).toLocaleString('pt-BR');
+  }
+  return String(value);
+}
+
+function farolColor(atingPct) {
+  if (atingPct === null) return 'neutral';
+  if (atingPct >= 0.95) return 'green';
+  if (atingPct >= 0.80) return 'yellow';
+  return 'red';
+}
+
+function renderFarol() {
+  const container = document.getElementById('farol-sections');
+  container.innerHTML = FAROL.map((section) => {
+    const tiles = section.kpis.map((k) => {
+      const ating = k.orcado != null && k.orcado !== 0 ? k.atual / k.orcado : null;
+      const color = farolColor(ating);
+      const atingTxt = ating !== null ? (ating * 100).toFixed(1) + '%' : '—';
+      return `
+        <div class="farol-tile ${color}">
+          <div class="name">${k.name}</div>
+          <div class="atual">${fmtKpi(k.atual, k.type)}</div>
+          <div class="meta">
+            <span>Orçado <b>${fmtKpi(k.orcado, k.type)}</b></span>
+            <span>M-1 <b>${fmtKpi(k.m1, k.type)}</b></span>
+          </div>
+          <div class="ating"><span class="dot"></span>${atingTxt} atingimento</div>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="farol-section">
+        <div class="farol-section-header">
+          <h3>${section.title}</h3>
+          ${section.subtitle ? `<div class="sub">${section.subtitle}</div>` : ''}
+        </div>
+        <div class="farol-grid">${tiles}</div>
+      </div>
+    `;
+  }).join('');
+}
+
 // ===== TABS =====
 document.querySelectorAll('.tab').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -293,6 +345,7 @@ function init() {
   renderMonthSelect();
   setScenarioInputs(BASELINE);
   renderRolling();
+  renderFarol();
 
   // Live currency formatting for invest input
   const invEl = document.getElementById('s-inv');
