@@ -1,0 +1,33 @@
+name: Sync Google Sheet
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes
+  workflow_dispatch: {}      # allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch CSV from Google Sheets
+        run: |
+          mkdir -p data
+          curl -sL "https://docs.google.com/spreadsheets/d/1nqmUWib7mVsGkuinwnwxeS9swOlvAEIuUHGMoXjflwU/gviz/tq?tqx=out:csv&gid=0" -o data/db.csv
+          test -s data/db.csv
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet --exit-code data/db.csv; then
+            echo "No changes."
+          else
+            git add data/db.csv
+            git commit -m "chore: sync db.csv from Google Sheets"
+            git push
+          fi

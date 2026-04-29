@@ -311,6 +311,45 @@ main { padding: 32px; max-width: 100%; margin: 0; }
   grid-template-columns: 1fr 2fr;
   gap: 12px;
 }
+.connected-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.connected-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text);
+}
+.connected-badge .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--positive);
+  box-shadow: 0 0 8px var(--positive);
+  animation: pulse 2s infinite;
+}
+.connected-badge .link {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 12px;
+  margin-left: 8px;
+  border-left: 1px solid var(--border);
+  padding-left: 12px;
+}
+.connected-badge .link:hover { color: var(--accent); }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
 .upload-area {
   display: flex;
   align-items: center;

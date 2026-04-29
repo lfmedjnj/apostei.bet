@@ -416,24 +416,23 @@ async function loadGSheet(url) {
   applyRows(parseDbWorkbook(wb), 'Google Sheets');
 }
 
+// Loads the CSV synced by GitHub Actions from the same origin (zero CORS)
+async function loadFromRepo() {
+  setStatus('Sincronizando dados...');
+  try {
+    const resp = await fetch('./data/db.csv?ts=' + Date.now());
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const csvText = await resp.text();
+    const wb = XLSX.read(csvText, { type: 'string', raw: false });
+    applyRows(parseDbWorkbook(wb), 'Google Sheets (auto-sync)');
+  } catch (err) {
+    setStatus(`Erro: ${err.message}`, 'error');
+    console.error(err);
+  }
+}
+
 function initFarol() {
-  const fileInput = document.getElementById('db-file');
-  const uploadArea = document.getElementById('upload-area');
   const dateInput = document.getElementById('as-of-date');
-
-  fileInput.addEventListener('change', (e) => {
-    if (e.target.files[0]) handleFile(e.target.files[0]);
-  });
-
-  ['dragenter', 'dragover'].forEach((ev) => uploadArea.addEventListener(ev, (e) => {
-    e.preventDefault(); uploadArea.classList.add('dragover');
-  }));
-  ['dragleave', 'drop'].forEach((ev) => uploadArea.addEventListener(ev, (e) => {
-    e.preventDefault(); uploadArea.classList.remove('dragover');
-  }));
-  uploadArea.addEventListener('drop', (e) => {
-    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-  });
 
   document.querySelectorAll('#period-pills .pill').forEach((p) => {
     p.addEventListener('click', () => {
@@ -451,25 +450,17 @@ function initFarol() {
     }
   });
 
-  const gsheetBtn = document.getElementById('gsheet-load');
-  const gsheetInput = document.getElementById('gsheet-url');
-  if (gsheetBtn) {
-    gsheetBtn.addEventListener('click', async () => {
-      try { await loadGSheet(gsheetInput.value); }
-      catch (err) { setStatus(`Erro: ${err.message}`, 'error'); console.error(err); }
-    });
-    gsheetInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') gsheetBtn.click(); });
-  }
+  const refreshBtn = document.getElementById('refresh-btn');
+  if (refreshBtn) refreshBtn.addEventListener('click', loadFromRepo);
 
   // Auto-load on first Tab 2 open
   let autoLoaded = false;
   const tab2Btn = document.querySelector('[data-tab="tab2"]');
-  if (tab2Btn && gsheetInput?.value) {
-    tab2Btn.addEventListener('click', async () => {
+  if (tab2Btn) {
+    tab2Btn.addEventListener('click', () => {
       if (autoLoaded || FAROL_STATE.rows.length) return;
       autoLoaded = true;
-      try { await loadGSheet(gsheetInput.value); }
-      catch (err) { setStatus(`Erro: ${err.message} — clique ↻ Carregar para tentar novamente`, 'error'); console.error(err); autoLoaded = false; }
+      loadFromRepo();
     });
   }
 }
