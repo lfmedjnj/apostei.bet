@@ -110,7 +110,7 @@ main { padding: 32px; max-width: 100%; margin: 0; }
 /* KPI GRID */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 12px;
 }
 .kpi {
@@ -155,6 +155,7 @@ main { padding: 32px; max-width: 100%; margin: 0; }
 }
 .kpi-input input:focus { border-bottom-color: var(--accent); }
 .kpi-input span { color: var(--text-muted); font-size: 18px; }
+.kpi-input span.prefix { font-size: 18px; margin-right: 4px; }
 .kpi-input input::-webkit-outer-spin-button,
 .kpi-input input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .kpi-input input { -moz-appearance: textfield; }

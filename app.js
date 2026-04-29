@@ -45,6 +45,7 @@ const state = {
 
 // ===== RENDER: BASELINE KPIs (per selected month) =====
 function renderBaseline(monthIdx = 0) {
+  document.getElementById('b-inv').textContent = fmtBRL(BASELINE.invest[monthIdx]);
   document.getElementById('b-r1').textContent = fmtPct(BASELINE.retM0M1Monthly[monthIdx]);
   document.getElementById('b-r2').textContent = fmtPct(BASELINE.retM1M2Monthly[monthIdx]);
   document.getElementById('b-r3').textContent = fmtPct(BASELINE.retM3plusMonthly[monthIdx]);
@@ -61,6 +62,7 @@ function renderMonthSelect() {
   sel.addEventListener('change', (e) => {
     state.selectedMonth = parseInt(e.target.value, 10);
     renderBaseline(state.selectedMonth);
+    document.getElementById('s-inv').value = fmtThousands(BASELINE.invest[state.selectedMonth]);
     renderRolling();
     update();
   });
@@ -156,7 +158,11 @@ function renderRolling() {
 }
 
 // ===== RENDER: SCENARIO INPUTS =====
+const fmtThousands = (v) => Math.round(v).toLocaleString('pt-BR');
+const parseThousands = (s) => parseFloat(String(s).replace(/\./g, '').replace(/,/g, '.')) || 0;
+
 function setScenarioInputs(values) {
+  document.getElementById('s-inv').value = fmtThousands(BASELINE.invest[state.selectedMonth]);
   document.getElementById('s-r1').value = (values.retM0M1 * 100).toFixed(1);
   document.getElementById('s-r2').value = (values.retM1M2 * 100).toFixed(1);
   document.getElementById('s-r3').value = (values.retM3plus * 100).toFixed(1);
@@ -165,13 +171,17 @@ function setScenarioInputs(values) {
 }
 
 function readScenarioInputs() {
+  // Investment override applies only to the selected month
+  const invOverride = parseThousands(document.getElementById('s-inv').value);
+  const invest = BASELINE.invest.slice();
+  if (invOverride > 0) invest[state.selectedMonth] = invOverride;
   return {
     retM0M1: parseFloat(document.getElementById('s-r1').value) / 100 || 0,
     retM1M2: parseFloat(document.getElementById('s-r2').value) / 100 || 0,
     retM3plus: parseFloat(document.getElementById('s-r3').value) / 100 || 0,
     ggrPct: parseFloat(document.getElementById('s-ggr').value) / 100 || 0,
     roasDepM0: parseFloat(document.getElementById('s-roas').value) || 0,
-    invest: BASELINE.invest
+    invest
   };
 }
 
@@ -283,6 +293,15 @@ function init() {
   renderMonthSelect();
   setScenarioInputs(BASELINE);
   renderRolling();
+
+  // Live currency formatting for invest input
+  const invEl = document.getElementById('s-inv');
+  invEl.addEventListener('input', () => {
+    const raw = invEl.value.replace(/\D/g, '');
+    invEl.value = raw ? Number(raw).toLocaleString('pt-BR') : '';
+    update();
+    recalcRolling();
+  });
 
   ['s-r1', 's-r2', 's-r3', 's-ggr', 's-roas'].forEach((id) => {
     document.getElementById(id).addEventListener('input', () => { update(); recalcRolling(); });
