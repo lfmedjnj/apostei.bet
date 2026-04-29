@@ -385,11 +385,14 @@ async function loadGSheet(url) {
   if (!id) throw new Error('URL inválida');
   setStatus('Carregando Google Sheets...');
 
-  // Try gviz endpoint first (better CORS on redirects), fallback to export
-  const endpoints = [
+  // Try multiple endpoints in order of preference, with CORS proxy as last resort
+  const direct = [
     `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&gid=${gid}`,
     `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`
   ];
+  const proxied = direct.map((u) => `https://corsproxy.io/?${encodeURIComponent(u)}`);
+  const endpoints = [...direct, ...proxied];
+
   let csvText = null;
   let lastErr = null;
   for (const csvUrl of endpoints) {
@@ -402,7 +405,7 @@ async function loadGSheet(url) {
         lastErr = new Error(`HTTP ${resp.status}`); continue;
       }
       csvText = await resp.text();
-      break;
+      if (csvText && csvText.length > 50) break;
     } catch (e) {
       lastErr = e;
     }
@@ -456,6 +459,18 @@ function initFarol() {
       catch (err) { setStatus(`Erro: ${err.message}`, 'error'); console.error(err); }
     });
     gsheetInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') gsheetBtn.click(); });
+  }
+
+  // Auto-load on first Tab 2 open
+  let autoLoaded = false;
+  const tab2Btn = document.querySelector('[data-tab="tab2"]');
+  if (tab2Btn && gsheetInput?.value) {
+    tab2Btn.addEventListener('click', async () => {
+      if (autoLoaded || FAROL_STATE.rows.length) return;
+      autoLoaded = true;
+      try { await loadGSheet(gsheetInput.value); }
+      catch (err) { setStatus(`Erro: ${err.message} — clique ↻ Carregar para tentar novamente`, 'error'); console.error(err); autoLoaded = false; }
+    });
   }
 }
 
