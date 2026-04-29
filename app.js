@@ -351,7 +351,6 @@ function init() {
   renderMonthSelect();
   setScenarioInputs(BASELINE);
   renderRolling();
-  renderFarol();
 
   // Investment input — value in millions (e.g. "15" = R$ 15M, "22.5" = R$ 22.5M)
   const invEl = document.getElementById('s-inv');

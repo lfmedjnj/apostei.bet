@@ -143,36 +143,42 @@
 
     <!-- TAB 2: FAROL -->
     <section id="tab2" class="tab-panel">
-      <div class="farol-filters">
-        <div class="filter">
-          <label>Marca</label>
-          <select disabled><option>Apostei.bet</option></select>
+      <div class="farol-toolbar">
+        <div class="upload-area" id="upload-area">
+          <input type="file" id="db-file" accept=".xlsx,.xls,.csv" hidden />
+          <label for="db-file" class="upload-btn">⬆ Upload Database</label>
+          <span class="upload-status" id="upload-status">Nenhuma base carregada — use o botão acima ou arraste um .xlsx</span>
         </div>
-        <div class="filter">
-          <label>Período</label>
-          <select disabled><option>MTD (Mês)</option><option>WTD (Semana)</option><option>D-1 (Dia)</option></select>
-        </div>
-        <div class="filter">
-          <label>Canal</label>
-          <select disabled><option>Todos</option></select>
-        </div>
-        <div class="filter">
-          <label>Campanha</label>
-          <select disabled><option>Todas</option></select>
-        </div>
-        <div class="filter">
-          <label>Indicador</label>
-          <select disabled><option>Todos</option></select>
+        <div class="farol-filter-row">
+          <div class="filter">
+            <label>Período</label>
+            <div class="pills" id="period-pills">
+              <button class="pill active" data-period="MTD">MTD</button>
+              <button class="pill" data-period="WTD">WTD</button>
+              <button class="pill" data-period="Monthly">Monthly</button>
+              <button class="pill" data-period="YTD">YTD</button>
+            </div>
+          </div>
+          <div class="filter">
+            <label>Data de referência (D-1)</label>
+            <input type="date" id="as-of-date" class="month-select" disabled />
+          </div>
         </div>
       </div>
-
-      <div id="farol-sections"></div>
+      <div id="farol-sections">
+        <div class="empty-state">
+          <h3>Nenhuma base carregada</h3>
+          <p class="muted">Faça upload do Theorical DB (XLSX) para ver as KPIs em tempo real.</p>
+          <p class="muted small">Esperado: aba <code>Theorical DB</code> com colunas Date / Invest / FTD / Deposit / GGR + colunas BP equivalentes.</p>
+        </div>
+      </div>
     </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="data.js"></script>
-  <script src="farol_data.js"></script>
   <script src="app.js"></script>
+  <script src="farol.js"></script>
 </body>
 </html>

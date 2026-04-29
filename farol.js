@@ -1,0 +1,358 @@
+// ===== FAROL ENGINE =====
+// Loads Theorical DB from XLSX upload, aggregates by period, renders KPI tiles.
+
+const FAROL_STATE = {
+  rows: [],          // parsed DB rows
+  asOfDate: null,    // current "D-1" date
+  period: 'MTD',     // MTD | WTD | Monthly | YTD
+  fileName: null
+};
+
+// ---------- PARSING ----------
+// Maps DB headers (row 1 of Theorical DB sheet) to our internal keys.
+const COL_MAP = {
+  'Date': 'date',
+  'Invest. Aquisição': 'invest',
+  'FTD amount': 'ftdAmount',
+  'FTD #': 'ftdCount',
+  'Total Deposit': 'totalDeposit',
+  'DEP M0': 'depM0',
+  'M+1': 'mPlus1',
+  'M+2': 'mPlus2',
+  'M3+': 'm3plus',
+  'GGR': 'ggr',
+  'Apostas': 'apostas'
+};
+
+function normalizeHeader(h) {
+  return String(h || '').replace(/\s+/g, ' ').trim();
+}
+
+function excelSerialToDate(n) {
+  // Excel epoch: 1899-12-30
+  return new Date(Math.round((n - 25569) * 86400 * 1000));
+}
+
+function parseDbWorkbook(wb) {
+  const sheetName = wb.SheetNames.find((n) => /theorical|theoretical/i.test(n)) || wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+  if (aoa.length < 3) throw new Error('Sheet empty');
+
+  const groupRow = aoa[0] || [];   // "Criteria" / "Actuals" / "BP"
+  const headerRow = aoa[1] || [];
+
+  // Build column index: { actuals: { date: 3, invest: 4, ... }, bp: { invest: 14, ... } }
+  let currentGroup = '';
+  const colIdx = { actuals: {}, bp: {}, criteria: {} };
+  for (let c = 0; c < headerRow.length; c++) {
+    if (groupRow[c]) currentGroup = String(groupRow[c]).trim().toLowerCase();
+    const h = normalizeHeader(headerRow[c]);
+    const key = COL_MAP[h];
+    if (!key) continue;
+    if (currentGroup === 'criteria') colIdx.criteria[key] = c;
+    else if (currentGroup === 'actuals') colIdx.actuals[key] = c;
+    else if (currentGroup === 'bp') colIdx.bp[key] = c;
+  }
+
+  const dateCol = colIdx.criteria.date;
+  if (dateCol === undefined) throw new Error('Coluna "Date" não encontrada');
+
+  const rows = [];
+  for (let r = 2; r < aoa.length; r++) {
+    const row = aoa[r] || [];
+    const rawDate = row[dateCol];
+    if (rawDate === undefined || rawDate === null || rawDate === '') continue;
+    let d;
+    if (rawDate instanceof Date) d = rawDate;
+    else if (typeof rawDate === 'number') d = excelSerialToDate(rawDate);
+    else d = new Date(rawDate);
+    if (isNaN(d.getTime())) continue;
+
+    const obj = { date: d };
+    for (const [k, c] of Object.entries(colIdx.actuals)) obj[k] = Number(row[c]) || 0;
+    for (const [k, c] of Object.entries(colIdx.bp)) obj['bp_' + k] = Number(row[c]) || 0;
+    rows.push(obj);
+  }
+  rows.sort((a, b) => a.date - b.date);
+  return rows;
+}
+
+// ---------- DATE / PERIOD HELPERS ----------
+const dayMs = 86400 * 1000;
+function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function endOfMonth(d) { return new Date(d.getFullYear(), d.getMonth() + 1, 0); }
+function startOfWeekMon(d) { // Monday-based
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1 - day);
+  const r = new Date(d); r.setDate(d.getDate() + diff); r.setHours(0, 0, 0, 0); return r;
+}
+function shiftMonth(d, n) { return new Date(d.getFullYear(), d.getMonth() + n, d.getDate()); }
+function startOfYear(d) { return new Date(d.getFullYear(), 0, 1); }
+function shiftYear(d, n) { return new Date(d.getFullYear() + n, d.getMonth(), d.getDate()); }
+function sameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
+
+// Returns rows in [from, to] inclusive
+function filterRange(rows, from, to) {
+  return rows.filter((r) => r.date >= from && r.date <= to);
+}
+
+function periodRange(period, asOf) {
+  switch (period) {
+    case 'MTD':     return { from: startOfMonth(asOf), to: asOf };
+    case 'WTD':     return { from: startOfWeekMon(asOf), to: asOf };
+    case 'Monthly': return { from: startOfMonth(asOf), to: endOfMonth(asOf) };
+    case 'YTD':     return { from: startOfYear(asOf), to: asOf };
+  }
+}
+
+function periodRangeM1(period, asOf) {
+  // Same shape, one period back
+  switch (period) {
+    case 'MTD':     return { from: startOfMonth(shiftMonth(asOf, -1)), to: shiftMonth(asOf, -1) };
+    case 'WTD':     { const a = new Date(asOf); a.setDate(a.getDate() - 7); return { from: startOfWeekMon(a), to: a }; }
+    case 'Monthly': { const a = shiftMonth(asOf, -1); return { from: startOfMonth(a), to: endOfMonth(a) }; }
+    case 'YTD':     return { from: startOfYear(shiftYear(asOf, -1)), to: shiftYear(asOf, -1) };
+  }
+}
+
+// ---------- AGGREGATION ----------
+const SUM_FIELDS = ['invest', 'ftdAmount', 'ftdCount', 'totalDeposit', 'depM0', 'mPlus1', 'mPlus2', 'm3plus', 'ggr', 'apostas'];
+
+function aggregate(rows, withBp = true) {
+  const out = {};
+  SUM_FIELDS.forEach((f) => out[f] = 0);
+  if (withBp) SUM_FIELDS.forEach((f) => out['bp_' + f] = 0);
+  rows.forEach((r) => {
+    SUM_FIELDS.forEach((f) => out[f] += (r[f] || 0));
+    if (withBp) SUM_FIELDS.forEach((f) => out['bp_' + f] += (r['bp_' + f] || 0));
+  });
+  return out;
+}
+
+// Linear trend: scale current MTD pace to full month
+function trendForFullPeriod(currentSum, daysElapsed, daysInPeriod) {
+  if (!daysElapsed) return 0;
+  return currentSum * (daysInPeriod / daysElapsed);
+}
+
+// ---------- TILE DEFINITIONS ----------
+function safeDiv(a, b) { return b ? a / b : 0; }
+
+function buildTiles(agg, m1, bp, periodMeta) {
+  // periodMeta: { daysElapsed, daysInPeriod }
+  const trend = (v) => trendForFullPeriod(v, periodMeta.daysElapsed, periodMeta.daysInPeriod);
+
+  return [
+    {
+      title: 'Sales',
+      hero: true,
+      kpis: [
+        { name: `${FAROL_STATE.period} R$ GGR`, type: 'brl', atual: agg.ggr, orcado: agg.bp_ggr, m1: m1.ggr },
+        { name: `Trend R$ GGR`,                 type: 'brl', atual: trend(agg.ggr), orcado: bp.ggr, m1: m1.ggr },
+        { name: 'BP R$ GGR (período)',          type: 'brl', atual: bp.ggr, orcado: null, m1: null },
+        { name: 'Gap / Upside',                 type: 'brl', atual: agg.ggr - bp.ggr, orcado: null, m1: null }
+      ]
+    },
+    {
+      title: "KPI's Aquisição — GROWTH",
+      kpis: [
+        { name: 'Investimento',     type: 'brl', atual: agg.invest, orcado: agg.bp_invest, m1: m1.invest },
+        { name: '% do GGR',         type: 'pct', atual: safeDiv(agg.invest, agg.ggr), orcado: safeDiv(agg.bp_invest, agg.bp_ggr), m1: safeDiv(m1.invest, m1.ggr) },
+        { name: 'ROAS FTD',         type: 'x',   atual: safeDiv(agg.ftdAmount, agg.invest), orcado: safeDiv(agg.bp_ftdAmount, agg.bp_invest), m1: safeDiv(m1.ftdAmount, m1.invest) },
+        { name: 'ROAS DEP (D0)',    type: 'x',   atual: safeDiv(agg.depM0, agg.invest), orcado: safeDiv(agg.bp_depM0, agg.bp_invest), m1: safeDiv(m1.depM0, m1.invest) },
+        { name: 'Depósitos TT',     type: 'brl', atual: agg.totalDeposit, orcado: agg.bp_totalDeposit, m1: m1.totalDeposit },
+        { name: 'Turnover (Apostas)', type: 'brl', atual: agg.apostas, orcado: agg.bp_apostas, m1: m1.apostas }
+      ]
+    },
+    {
+      title: 'Funil de Aquisição',
+      kpis: [
+        { name: 'FTD Amount',  type: 'brl', atual: agg.ftdAmount, orcado: agg.bp_ftdAmount, m1: m1.ftdAmount },
+        { name: 'FTD #',       type: 'qty', atual: agg.ftdCount, orcado: agg.bp_ftdCount, m1: m1.ftdCount },
+        { name: 'Ticket Médio (FTD)', type: 'brl', atual: safeDiv(agg.ftdAmount, agg.ftdCount), orcado: safeDiv(agg.bp_ftdAmount, agg.bp_ftdCount), m1: safeDiv(m1.ftdAmount, m1.ftdCount) },
+        { name: 'CAC',         type: 'brl', atual: safeDiv(agg.invest, agg.ftdCount), orcado: safeDiv(agg.bp_invest, agg.bp_ftdCount), m1: safeDiv(m1.invest, m1.ftdCount) }
+      ]
+    },
+    {
+      title: 'Cohort Depósito',
+      kpis: [
+        { name: 'DEP M0',      type: 'brl', atual: agg.depM0, orcado: agg.bp_depM0, m1: m1.depM0 },
+        { name: 'M+1',         type: 'brl', atual: agg.mPlus1, orcado: agg.bp_mPlus1, m1: m1.mPlus1 },
+        { name: 'M+2',         type: 'brl', atual: agg.mPlus2, orcado: agg.bp_mPlus2, m1: m1.mPlus2 },
+        { name: 'M3+',         type: 'brl', atual: agg.m3plus, orcado: agg.bp_m3plus, m1: m1.m3plus }
+      ]
+    }
+  ];
+}
+
+// ---------- RENDER ----------
+function renderDynamicFarol() {
+  const container = document.getElementById('farol-sections');
+  if (!FAROL_STATE.rows.length) {
+    container.innerHTML = `<div class="empty-state">
+      <h3>Nenhuma base carregada</h3>
+      <p class="muted">Faça upload do Theorical DB (XLSX) para ver as KPIs em tempo real.</p>
+    </div>`;
+    return;
+  }
+
+  const asOf = FAROL_STATE.asOfDate;
+  const range = periodRange(FAROL_STATE.period, asOf);
+  const rangeM1 = periodRangeM1(FAROL_STATE.period, asOf);
+  const fullRange = { from: startOfMonth(asOf), to: endOfMonth(asOf) };
+
+  const agg = aggregate(filterRange(FAROL_STATE.rows, range.from, range.to));
+  const m1 = aggregate(filterRange(FAROL_STATE.rows, rangeM1.from, rangeM1.to), false);
+  const bp = aggregate(filterRange(FAROL_STATE.rows, fullRange.from, fullRange.to));
+
+  const daysElapsed = Math.max(1, Math.round((range.to - range.from) / dayMs) + 1);
+  const daysInPeriod = Math.round((fullRange.to - fullRange.from) / dayMs) + 1;
+
+  const sections = buildTiles(agg, m1, { ggr: bp.bp_ggr }, { daysElapsed, daysInPeriod });
+
+  // Sales hero (first section)
+  const sales = sections[0];
+  const salesGgr = sales.kpis[0];
+  const trendGgr = sales.kpis[1];
+  const bpGgr = sales.kpis[2];
+  const gap = sales.kpis[3];
+  const ating = bpGgr.atual ? salesGgr.atual / bpGgr.atual : 0;
+  const heroColor = farolColor(ating);
+  const sign = gap.atual >= 0 ? '+' : '';
+
+  let html = `
+    <div class="sales-hero">
+      <div class="hero-main">
+        <div class="hero-label">${salesGgr.name}</div>
+        <div class="hero-value">${fmtKpi(salesGgr.atual, 'brl')}</div>
+        <div class="hero-sub ${gap.atual >= 0 ? 'positive' : 'negative'}">${sign}${fmtKpi(gap.atual, 'brl')} vs BP (${(ating * 100).toFixed(1)}%)</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-label">Trend GGR</div>
+        <div class="v">${fmtKpi(trendGgr.atual, 'brl')}</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-label">BP GGR (período)</div>
+        <div class="v">${fmtKpi(bpGgr.atual, 'brl')}</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-label">Gap / Upside</div>
+        <div class="v" style="color: var(--${gap.atual >= 0 ? 'positive' : 'negative'})">${sign}${fmtKpi(gap.atual, 'brl')}</div>
+      </div>
+    </div>
+  `;
+
+  // Other sections as standard tile grids
+  for (let i = 1; i < sections.length; i++) {
+    const section = sections[i];
+    const tiles = section.kpis.map((k) => {
+      const at = k.orcado != null && k.orcado !== 0 ? k.atual / k.orcado : null;
+      const color = farolColor(at);
+      const atTxt = at !== null ? (at * 100).toFixed(1) + '%' : '—';
+      return `
+        <div class="farol-tile ${color}">
+          <div class="name">${k.name}</div>
+          <div class="atual">${fmtKpi(k.atual, k.type)}</div>
+          <div class="meta">
+            <span>Orçado <b>${fmtKpi(k.orcado, k.type)}</b></span>
+            <span>M-1 <b>${fmtKpi(k.m1, k.type)}</b></span>
+          </div>
+          <div class="ating"><span class="dot"></span>${atTxt} atingimento</div>
+        </div>
+      `;
+    }).join('');
+    html += `
+      <div class="farol-section">
+        <div class="farol-section-header"><h3>${section.title}</h3></div>
+        <div class="farol-grid">${tiles}</div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+}
+
+// ---------- UPLOAD HANDLERS ----------
+function handleFile(file) {
+  const status = document.getElementById('upload-status');
+  status.textContent = `Lendo ${file.name}...`;
+  status.className = 'upload-status';
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array', cellDates: true });
+      const rows = parseDbWorkbook(wb);
+      if (!rows.length) throw new Error('Nenhuma linha encontrada');
+
+      FAROL_STATE.rows = rows;
+      FAROL_STATE.fileName = file.name;
+      // Default asOf: last date that has actuals (any of invest/ggr/totalDeposit > 0)
+      let lastActual = rows[rows.length - 1].date;
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if (rows[i].invest > 0 || rows[i].ggr > 0 || rows[i].totalDeposit > 0) {
+          lastActual = rows[i].date;
+          break;
+        }
+      }
+      const lastDate = rows[rows.length - 1].date;
+      FAROL_STATE.asOfDate = lastActual;
+
+      const dateInput = document.getElementById('as-of-date');
+      dateInput.disabled = false;
+      dateInput.value = lastActual.toISOString().slice(0, 10);
+      dateInput.min = rows[0].date.toISOString().slice(0, 10);
+      dateInput.max = lastDate.toISOString().slice(0, 10);
+
+      status.textContent = `✓ ${file.name} — ${rows.length} linhas (${rows[0].date.toLocaleDateString('pt-BR')} → ${lastDate.toLocaleDateString('pt-BR')})`;
+      status.className = 'upload-status loaded';
+
+      renderDynamicFarol();
+    } catch (err) {
+      status.textContent = `Erro: ${err.message}`;
+      status.className = 'upload-status error';
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function initFarol() {
+  const fileInput = document.getElementById('db-file');
+  const uploadArea = document.getElementById('upload-area');
+  const dateInput = document.getElementById('as-of-date');
+
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+  });
+
+  ['dragenter', 'dragover'].forEach((ev) => uploadArea.addEventListener(ev, (e) => {
+    e.preventDefault(); uploadArea.classList.add('dragover');
+  }));
+  ['dragleave', 'drop'].forEach((ev) => uploadArea.addEventListener(ev, (e) => {
+    e.preventDefault(); uploadArea.classList.remove('dragover');
+  }));
+  uploadArea.addEventListener('drop', (e) => {
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+
+  document.querySelectorAll('#period-pills .pill').forEach((p) => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('#period-pills .pill').forEach((x) => x.classList.remove('active'));
+      p.classList.add('active');
+      FAROL_STATE.period = p.dataset.period;
+      renderDynamicFarol();
+    });
+  });
+
+  dateInput.addEventListener('change', (e) => {
+    if (e.target.value) {
+      FAROL_STATE.asOfDate = new Date(e.target.value + 'T00:00:00');
+      renderDynamicFarol();
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initFarol);

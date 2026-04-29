@@ -3,3 +3,4 @@ Thumbs.db
 *.log
 node_modules/
 .claude/
+.test_db.xlsx

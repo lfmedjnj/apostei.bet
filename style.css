@@ -296,6 +296,99 @@ main { padding: 32px; max-width: 100%; margin: 0; }
 #rolling-table tbody input { -moz-appearance: textfield; }
 
 /* ====== FAROL (TAB 2) ====== */
+.farol-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+.upload-area {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: var(--surface-2);
+}
+.upload-area.dragover { border-color: var(--accent); background: rgba(255,255,255,0.04); }
+.upload-btn {
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.upload-btn:hover { opacity: 0.85; }
+.upload-status { color: var(--text-muted); font-size: 13px; }
+.upload-status.loaded { color: var(--positive); }
+.upload-status.error { color: var(--negative); }
+
+.farol-filter-row { display: flex; gap: 24px; flex-wrap: wrap; }
+.farol-filter-row .filter { min-width: 200px; }
+.pills { display: flex; gap: 4px; }
+.pill {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pill:hover { color: var(--text); }
+.pill.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.empty-state h3 { font-size: 16px; margin-bottom: 8px; }
+.empty-state .small { font-size: 12px; margin-top: 12px; }
+.empty-state code { background: var(--surface-2); padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+
+.sales-hero {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+.sales-hero .hero-main { border-right: 1px solid var(--border-strong); padding-right: 20px; }
+.sales-hero .hero-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-muted); margin-bottom: 8px;
+}
+.sales-hero .hero-value {
+  font-size: 36px; font-weight: 700; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.sales-hero .hero-sub {
+  font-size: 13px; color: var(--text-muted); margin-top: 6px;
+}
+.sales-hero .hero-sub.positive { color: var(--positive); }
+.sales-hero .hero-sub.negative { color: var(--negative); }
+.sales-hero .hero-stat { padding: 4px 0; }
+.sales-hero .hero-stat .v {
+  font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 4px;
+}
+
 .farol-filters {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
