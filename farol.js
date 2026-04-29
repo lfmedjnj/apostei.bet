@@ -369,15 +369,31 @@ async function loadGSheet(url) {
   const { id, gid } = parseGSheetUrl(url);
   if (!id) throw new Error('URL inválida');
   setStatus('Carregando Google Sheets...');
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
-  const resp = await fetch(csvUrl);
-  if (!resp.ok) {
-    if (resp.status === 401 || resp.status === 403) {
-      throw new Error('Sheet privado — habilite "Anyone with the link" em Compartilhar');
+
+  // Try gviz endpoint first (better CORS on redirects), fallback to export
+  const endpoints = [
+    `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&gid=${gid}`,
+    `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`
+  ];
+  let csvText = null;
+  let lastErr = null;
+  for (const csvUrl of endpoints) {
+    try {
+      const resp = await fetch(csvUrl);
+      if (!resp.ok) {
+        if (resp.status === 401 || resp.status === 403) {
+          throw new Error('Sheet privado — habilite "Anyone with the link" em Compartilhar');
+        }
+        lastErr = new Error(`HTTP ${resp.status}`); continue;
+      }
+      csvText = await resp.text();
+      break;
+    } catch (e) {
+      lastErr = e;
     }
-    throw new Error(`HTTP ${resp.status}`);
   }
-  const csvText = await resp.text();
+  if (!csvText) throw lastErr || new Error('Falha ao buscar a sheet');
+
   const wb = XLSX.read(csvText, { type: 'string', raw: false });
   applyRows(parseDbWorkbook(wb), 'Google Sheets');
 }
