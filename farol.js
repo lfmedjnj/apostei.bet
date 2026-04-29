@@ -80,29 +80,44 @@ function parseDbWorkbook(wb) {
   const sheetName = wb.SheetNames.find((n) => /theorical|theoretical/i.test(n)) || wb.SheetNames[0];
   const sheet = wb.Sheets[sheetName];
   const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
-  if (aoa.length < 3) throw new Error('Sheet empty');
+  if (aoa.length < 2) throw new Error('Sheet vazia');
 
-  const groupRow = aoa[0] || [];   // "Criteria" / "Actuals" / "BP"
-  const headerRow = aoa[1] || [];
+  // Detect format: single-row ("Criteria Date" / "Actuals GGR") vs two-row (group + header)
+  const row0 = (aoa[0] || []).map((v) => String(v || ''));
+  const singleRow = row0.some((h) => /^(criteria|actuals|bp)\s+/i.test(h));
 
-  // Build column index: { actuals: { date: 3, invest: 4, ... }, bp: { invest: 14, ... } }
-  let currentGroup = '';
   const colIdx = { actuals: {}, bp: {}, criteria: {} };
-  for (let c = 0; c < headerRow.length; c++) {
-    if (groupRow[c]) currentGroup = String(groupRow[c]).trim().toLowerCase();
-    const h = normalizeHeader(headerRow[c]);
-    const key = COL_MAP[h];
-    if (!key) continue;
-    if (currentGroup === 'criteria') colIdx.criteria[key] = c;
-    else if (currentGroup === 'actuals') colIdx.actuals[key] = c;
-    else if (currentGroup === 'bp') colIdx.bp[key] = c;
+  let dataStart;
+
+  if (singleRow) {
+    for (let c = 0; c < row0.length; c++) {
+      const m = row0[c].match(/^(criteria|actuals|bp)\s+(.+)$/i);
+      if (!m) continue;
+      const group = m[1].toLowerCase();
+      const name = normalizeHeader(m[2]);
+      const key = COL_MAP[name];
+      if (key) colIdx[group][key] = c;
+    }
+    dataStart = 1;
+  } else {
+    const groupRow = aoa[0] || [];
+    const headerRow = aoa[1] || [];
+    let currentGroup = '';
+    for (let c = 0; c < headerRow.length; c++) {
+      if (groupRow[c]) currentGroup = String(groupRow[c]).trim().toLowerCase();
+      const h = normalizeHeader(headerRow[c]);
+      const key = COL_MAP[h];
+      if (!key) continue;
+      if (colIdx[currentGroup]) colIdx[currentGroup][key] = c;
+    }
+    dataStart = 2;
   }
 
   const dateCol = colIdx.criteria.date;
   if (dateCol === undefined) throw new Error('Coluna "Date" não encontrada');
 
   const rows = [];
-  for (let r = 2; r < aoa.length; r++) {
+  for (let r = dataStart; r < aoa.length; r++) {
     const row = aoa[r] || [];
     const d = parseDate(row[dateCol]);
     if (!d) continue;
