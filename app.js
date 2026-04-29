@@ -62,7 +62,7 @@ function renderMonthSelect() {
   sel.addEventListener('change', (e) => {
     state.selectedMonth = parseInt(e.target.value, 10);
     renderBaseline(state.selectedMonth);
-    document.getElementById('s-inv').value = fmtThousands(BASELINE.invest[state.selectedMonth]);
+    document.getElementById('s-inv').value = fmtMillions(BASELINE.invest[state.selectedMonth]);
     renderRolling();
     update();
   });
@@ -158,11 +158,17 @@ function renderRolling() {
 }
 
 // ===== RENDER: SCENARIO INPUTS =====
-const fmtThousands = (v) => Math.round(v).toLocaleString('pt-BR');
-const parseThousands = (s) => parseFloat(String(s).replace(/\./g, '').replace(/,/g, '.')) || 0;
+const fmtMillions = (v) => {
+  const m = v / 1e6;
+  return Number.isInteger(m) ? String(m) : m.toFixed(1);
+};
+const parseMillions = (s) => {
+  const n = parseFloat(String(s).replace(',', '.'));
+  return isNaN(n) ? 0 : n * 1e6;
+};
 
 function setScenarioInputs(values) {
-  document.getElementById('s-inv').value = fmtThousands(BASELINE.invest[state.selectedMonth]);
+  document.getElementById('s-inv').value = fmtMillions(BASELINE.invest[state.selectedMonth]);
   document.getElementById('s-r1').value = (values.retM0M1 * 100).toFixed(1);
   document.getElementById('s-r2').value = (values.retM1M2 * 100).toFixed(1);
   document.getElementById('s-r3').value = (values.retM3plus * 100).toFixed(1);
@@ -172,7 +178,7 @@ function setScenarioInputs(values) {
 
 function readScenarioInputs() {
   // Investment override applies only to the selected month
-  const invOverride = parseThousands(document.getElementById('s-inv').value);
+  const invOverride = parseMillions(document.getElementById('s-inv').value);
   const invest = BASELINE.invest.slice();
   if (invOverride > 0) invest[state.selectedMonth] = invOverride;
   return {
@@ -347,11 +353,14 @@ function init() {
   renderRolling();
   renderFarol();
 
-  // Live currency formatting for invest input
+  // Investment input — value in millions (e.g. "15" = R$ 15M, "22.5" = R$ 22.5M)
   const invEl = document.getElementById('s-inv');
   invEl.addEventListener('input', () => {
-    const raw = invEl.value.replace(/\D/g, '');
-    invEl.value = raw ? Number(raw).toLocaleString('pt-BR') : '';
+    // Allow only digits and a single decimal separator
+    let v = invEl.value.replace(/[^\d.,]/g, '').replace(',', '.');
+    const parts = v.split('.');
+    if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
+    invEl.value = v;
     update();
     recalcRolling();
   });
