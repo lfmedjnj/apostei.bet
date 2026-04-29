@@ -144,11 +144,18 @@
     <!-- TAB 2: FAROL -->
     <section id="tab2" class="tab-panel">
       <div class="farol-toolbar">
-        <div class="upload-area" id="upload-area">
-          <input type="file" id="db-file" accept=".xlsx,.xls,.csv" hidden />
-          <label for="db-file" class="upload-btn">⬆ Upload Database</label>
-          <span class="upload-status" id="upload-status">Nenhuma base carregada — use o botão acima ou arraste um .xlsx</span>
+        <div class="source-row">
+          <div class="upload-area" id="upload-area">
+            <input type="file" id="db-file" accept=".xlsx,.xls,.csv" hidden />
+            <label for="db-file" class="upload-btn">⬆ Upload XLSX</label>
+            <span class="muted small">ou arraste o arquivo aqui</span>
+          </div>
+          <div class="gsheet-area">
+            <input type="text" id="gsheet-url" placeholder="Cole a URL do Google Sheets" value="https://docs.google.com/spreadsheets/d/1nqmUWib7mVsGkuinwnwxeS9swOlvAEIuUHGMoXjflwU/edit?gid=0" />
+            <button id="gsheet-load" class="upload-btn">↻ Carregar</button>
+          </div>
         </div>
+        <div class="upload-status" id="upload-status">Nenhuma base carregada — faça upload ou conecte um Google Sheet</div>
         <div class="farol-filter-row">
           <div class="filter">
             <label>Período</label>

@@ -33,6 +33,49 @@ function excelSerialToDate(n) {
   return new Date(Math.round((n - 25569) * 86400 * 1000));
 }
 
+// Parses date in multiple formats: Date object, Excel serial, ISO, DD.MM.YYYY, DD/MM/YYYY
+function parseDate(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v === 'number') return excelSerialToDate(v);
+  const s = String(v).trim();
+  // DD.MM.YYYY or DD/MM/YYYY
+  const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (m) {
+    const d = new Date(+m[3], +m[2] - 1, +m[1]);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Parse number that may contain thousand separators ("," or ".") and "-" for empty
+function parseNumber(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  if (typeof v === 'number') return v;
+  let s = String(v).trim();
+  if (s === '-' || s === '—') return 0;
+  // Strip currency symbols
+  s = s.replace(/[R$\s]/g, '');
+  // If both . and , present: assume , is thousand sep (en) — strip commas
+  if (s.includes(',') && s.includes('.')) {
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      s = s.replace(/,/g, '');
+    }
+  } else if (s.includes(',') && !s.includes('.')) {
+    // Likely BR decimal "12,5" → 12.5
+    if (s.split(',').length === 2 && s.split(',')[1].length <= 2) {
+      s = s.replace(',', '.');
+    } else {
+      s = s.replace(/,/g, '');
+    }
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
 function parseDbWorkbook(wb) {
   const sheetName = wb.SheetNames.find((n) => /theorical|theoretical/i.test(n)) || wb.SheetNames[0];
   const sheet = wb.Sheets[sheetName];
@@ -61,17 +104,12 @@ function parseDbWorkbook(wb) {
   const rows = [];
   for (let r = 2; r < aoa.length; r++) {
     const row = aoa[r] || [];
-    const rawDate = row[dateCol];
-    if (rawDate === undefined || rawDate === null || rawDate === '') continue;
-    let d;
-    if (rawDate instanceof Date) d = rawDate;
-    else if (typeof rawDate === 'number') d = excelSerialToDate(rawDate);
-    else d = new Date(rawDate);
-    if (isNaN(d.getTime())) continue;
+    const d = parseDate(row[dateCol]);
+    if (!d) continue;
 
     const obj = { date: d };
-    for (const [k, c] of Object.entries(colIdx.actuals)) obj[k] = Number(row[c]) || 0;
-    for (const [k, c] of Object.entries(colIdx.bp)) obj['bp_' + k] = Number(row[c]) || 0;
+    for (const [k, c] of Object.entries(colIdx.actuals)) obj[k] = parseNumber(row[c]);
+    for (const [k, c] of Object.entries(colIdx.bp)) obj['bp_' + k] = parseNumber(row[c]);
     rows.push(obj);
   }
   rows.sort((a, b) => a.date - b.date);
@@ -273,50 +311,75 @@ function renderDynamicFarol() {
   container.innerHTML = html;
 }
 
-// ---------- UPLOAD HANDLERS ----------
-function handleFile(file) {
-  const status = document.getElementById('upload-status');
-  status.textContent = `Lendo ${file.name}...`;
-  status.className = 'upload-status';
+// ---------- LOAD PIPELINE ----------
+function setStatus(msg, cls) {
+  const el = document.getElementById('upload-status');
+  el.textContent = msg;
+  el.className = 'upload-status' + (cls ? ' ' + cls : '');
+}
 
+function applyRows(rows, sourceLabel) {
+  if (!rows.length) throw new Error('Nenhuma linha encontrada');
+  FAROL_STATE.rows = rows;
+  FAROL_STATE.fileName = sourceLabel;
+  let lastActual = rows[rows.length - 1].date;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i].invest > 0 || rows[i].ggr > 0 || rows[i].totalDeposit > 0) {
+      lastActual = rows[i].date; break;
+    }
+  }
+  FAROL_STATE.asOfDate = lastActual;
+
+  const lastDate = rows[rows.length - 1].date;
+  const dateInput = document.getElementById('as-of-date');
+  dateInput.disabled = false;
+  dateInput.value = lastActual.toISOString().slice(0, 10);
+  dateInput.min = rows[0].date.toISOString().slice(0, 10);
+  dateInput.max = lastDate.toISOString().slice(0, 10);
+
+  setStatus(`✓ ${sourceLabel} — ${rows.length} linhas (${rows[0].date.toLocaleDateString('pt-BR')} → ${lastDate.toLocaleDateString('pt-BR')})`, 'loaded');
+  renderDynamicFarol();
+}
+
+function handleFile(file) {
+  setStatus(`Lendo ${file.name}...`);
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const data = new Uint8Array(e.target.result);
       const wb = XLSX.read(data, { type: 'array', cellDates: true });
-      const rows = parseDbWorkbook(wb);
-      if (!rows.length) throw new Error('Nenhuma linha encontrada');
-
-      FAROL_STATE.rows = rows;
-      FAROL_STATE.fileName = file.name;
-      // Default asOf: last date that has actuals (any of invest/ggr/totalDeposit > 0)
-      let lastActual = rows[rows.length - 1].date;
-      for (let i = rows.length - 1; i >= 0; i--) {
-        if (rows[i].invest > 0 || rows[i].ggr > 0 || rows[i].totalDeposit > 0) {
-          lastActual = rows[i].date;
-          break;
-        }
-      }
-      const lastDate = rows[rows.length - 1].date;
-      FAROL_STATE.asOfDate = lastActual;
-
-      const dateInput = document.getElementById('as-of-date');
-      dateInput.disabled = false;
-      dateInput.value = lastActual.toISOString().slice(0, 10);
-      dateInput.min = rows[0].date.toISOString().slice(0, 10);
-      dateInput.max = lastDate.toISOString().slice(0, 10);
-
-      status.textContent = `✓ ${file.name} — ${rows.length} linhas (${rows[0].date.toLocaleDateString('pt-BR')} → ${lastDate.toLocaleDateString('pt-BR')})`;
-      status.className = 'upload-status loaded';
-
-      renderDynamicFarol();
+      applyRows(parseDbWorkbook(wb), file.name);
     } catch (err) {
-      status.textContent = `Erro: ${err.message}`;
-      status.className = 'upload-status error';
+      setStatus(`Erro: ${err.message}`, 'error');
       console.error(err);
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+function parseGSheetUrl(url) {
+  const idMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  const id = idMatch ? idMatch[1] : url.trim();
+  const gidMatch = url.match(/[?&#]gid=(\d+)/);
+  const gid = gidMatch ? gidMatch[1] : '0';
+  return { id, gid };
+}
+
+async function loadGSheet(url) {
+  const { id, gid } = parseGSheetUrl(url);
+  if (!id) throw new Error('URL inválida');
+  setStatus('Carregando Google Sheets...');
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
+  const resp = await fetch(csvUrl);
+  if (!resp.ok) {
+    if (resp.status === 401 || resp.status === 403) {
+      throw new Error('Sheet privado — habilite "Anyone with the link" em Compartilhar');
+    }
+    throw new Error(`HTTP ${resp.status}`);
+  }
+  const csvText = await resp.text();
+  const wb = XLSX.read(csvText, { type: 'string', raw: false });
+  applyRows(parseDbWorkbook(wb), 'Google Sheets');
 }
 
 function initFarol() {
@@ -353,6 +416,16 @@ function initFarol() {
       renderDynamicFarol();
     }
   });
+
+  const gsheetBtn = document.getElementById('gsheet-load');
+  const gsheetInput = document.getElementById('gsheet-url');
+  if (gsheetBtn) {
+    gsheetBtn.addEventListener('click', async () => {
+      try { await loadGSheet(gsheetInput.value); }
+      catch (err) { setStatus(`Erro: ${err.message}`, 'error'); console.error(err); }
+    });
+    gsheetInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') gsheetBtn.click(); });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', initFarol);
