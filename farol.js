@@ -360,19 +360,17 @@ function applyRows(rows, sourceLabel) {
   if (!rows.length) throw new Error('Nenhuma linha encontrada');
   FAROL_STATE.rows = rows;
   FAROL_STATE.fileName = sourceLabel;
-  let lastActual = rows[rows.length - 1].date;
-  for (let i = rows.length - 1; i >= 0; i--) {
-    if (rows[i].invest > 0 || rows[i].ggr > 0 || rows[i].totalDeposit > 0) {
-      lastActual = rows[i].date; break;
-    }
-  }
-  FAROL_STATE.asOfDate = lastActual;
+  const firstDate = rows[0].date;
+  const lastDate  = rows[rows.length - 1].date;
+  // Default to today, clamped within the data range
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const asOf  = today < firstDate ? firstDate : today > lastDate ? lastDate : today;
+  FAROL_STATE.asOfDate = asOf;
 
-  const lastDate = rows[rows.length - 1].date;
   const dateInput = document.getElementById('as-of-date');
   dateInput.disabled = false;
-  dateInput.value = lastActual.toISOString().slice(0, 10);
-  dateInput.min = rows[0].date.toISOString().slice(0, 10);
+  dateInput.value = asOf.toISOString().slice(0, 10);
+  dateInput.min = firstDate.toISOString().slice(0, 10);
   dateInput.max = lastDate.toISOString().slice(0, 10);
 
   setStatus(`✓ ${sourceLabel} — ${rows.length} linhas (${rows[0].date.toLocaleDateString('pt-BR')} → ${lastDate.toLocaleDateString('pt-BR')})`, 'loaded');
