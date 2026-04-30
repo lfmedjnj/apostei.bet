@@ -197,7 +197,7 @@ function trendForFullPeriod(currentSum, daysElapsed, daysInPeriod) {
 // ---------- TILE DEFINITIONS ----------
 function safeDiv(a, b) { return b ? a / b : 0; }
 
-function buildTiles(agg, m1, bp, periodMeta) {
+function buildTiles(agg, m1, bp, d1, btg, periodMeta) {
   // periodMeta: { daysElapsed, daysInPeriod }
   const trend = (v) => trendForFullPeriod(v, periodMeta.daysElapsed, periodMeta.daysInPeriod);
 
@@ -206,21 +206,23 @@ function buildTiles(agg, m1, bp, periodMeta) {
       title: 'Sales',
       hero: true,
       kpis: [
-        { name: `${FAROL_STATE.period} R$ GGR`, type: 'brl', atual: agg.ggr, orcado: agg.bp_ggr, m1: m1.ggr },
-        { name: `Trend R$ GGR`,                 type: 'brl', atual: trend(agg.ggr), orcado: bp.ggr, m1: m1.ggr },
-        { name: 'BP R$ GGR (período)',          type: 'brl', atual: bp.ggr, orcado: null, m1: null },
-        { name: 'Gap / Upside',                 type: 'brl', atual: agg.ggr - bp.ggr, orcado: null, m1: null }
+        { name: `${FAROL_STATE.period} R$ GGR`, type: 'brl', atual: agg.ggr,        orcado: agg.bp_ggr, m1: m1.ggr },
+        { name: 'Trend R$ GGR',                 type: 'brl', atual: trend(agg.ggr),  orcado: bp.bp_ggr,  m1: m1.ggr },
+        { name: 'BP R$ GGR (mês)',              type: 'brl', atual: bp.bp_ggr,       orcado: null,       m1: null   },
+        { name: 'Gap / Upside',                 type: 'brl', atual: agg.ggr - agg.bp_ggr, orcado: null,  m1: null   },
+        { name: 'BTG R$ GGR',                   type: 'brl', atual: btg.ggr,         orcado: null,       m1: null   }
       ]
     },
     {
       title: "KPI's Aquisição — GROWTH",
       kpis: [
-        { name: 'Investimento',     type: 'brl', atual: agg.invest, orcado: agg.bp_invest, m1: m1.invest },
-        { name: '% do GGR',         type: 'pct', atual: safeDiv(agg.invest, agg.ggr), orcado: safeDiv(agg.bp_invest, agg.bp_ggr), m1: safeDiv(m1.invest, m1.ggr) },
-        { name: 'ROAS FTD',         type: 'x',   atual: safeDiv(agg.ftdAmount, agg.invest), orcado: safeDiv(agg.bp_ftdAmount, agg.bp_invest), m1: safeDiv(m1.ftdAmount, m1.invest) },
-        { name: 'ROAS DEP (D0)',    type: 'x',   atual: safeDiv(agg.depM0, agg.invest), orcado: safeDiv(agg.bp_depM0, agg.bp_invest), m1: safeDiv(m1.depM0, m1.invest) },
-        { name: 'Depósitos TT',     type: 'brl', atual: agg.totalDeposit, orcado: agg.bp_totalDeposit, m1: m1.totalDeposit },
-        { name: 'Turnover (Apostas)', type: 'brl', atual: agg.apostas, orcado: agg.bp_apostas, m1: m1.apostas }
+        { name: 'Investimento',       type: 'brl', atual: agg.invest,                          orcado: agg.bp_invest,                            m1: m1.invest,      btg: btg.invest },
+        { name: '% GGR/Inv',          type: 'pct', atual: safeDiv(agg.invest, agg.ggr),         orcado: safeDiv(agg.bp_invest, agg.bp_ggr),        m1: safeDiv(m1.invest, m1.ggr) },
+        { name: 'ROAS FTD',           type: 'x',   atual: safeDiv(agg.ftdAmount, agg.invest),   orcado: safeDiv(agg.bp_ftdAmount, agg.bp_invest),  m1: safeDiv(m1.ftdAmount, m1.invest) },
+        { name: 'ROAS DEP (D0)',      type: 'x',   atual: safeDiv(agg.depM0, agg.invest),       orcado: safeDiv(agg.bp_depM0, agg.bp_invest),      m1: safeDiv(m1.depM0, m1.invest) },
+        { name: 'ROAS DEP (D-1)',     type: 'x',   atual: safeDiv(d1.depM0, d1.invest),         orcado: safeDiv(agg.bp_depM0, agg.bp_invest),      m1: safeDiv(m1.depM0, m1.invest) },
+        { name: 'Depósitos TT',       type: 'brl', atual: agg.totalDeposit,                     orcado: agg.bp_totalDeposit,                       m1: m1.totalDeposit, btg: btg.totalDeposit },
+        { name: 'Turnover (Apostas)', type: 'brl', atual: agg.apostas,                          orcado: agg.bp_apostas,                            m1: m1.apostas }
       ]
     },
     {
@@ -261,42 +263,46 @@ function renderDynamicFarol() {
   const fullRange = { from: startOfMonth(asOf), to: endOfMonth(asOf) };
 
   const agg = aggregate(filterRange(FAROL_STATE.rows, range.from, range.to));
-  const m1 = aggregate(filterRange(FAROL_STATE.rows, rangeM1.from, rangeM1.to), false);
-  const bp = aggregate(filterRange(FAROL_STATE.rows, fullRange.from, fullRange.to));
+  const m1  = aggregate(filterRange(FAROL_STATE.rows, rangeM1.from, rangeM1.to), false);
+  const bp  = aggregate(filterRange(FAROL_STATE.rows, fullRange.from, fullRange.to));
+  // D-1: same period but up to one day before asOf (for ROAS DEP D-1)
+  const d1  = aggregate(filterRange(FAROL_STATE.rows, range.from, new Date(asOf.getTime() - dayMs)));
+  // BTG: how much still needed to deliver the BP target
+  const btg = { ggr: bp.bp_ggr - agg.ggr, invest: bp.bp_invest - agg.invest, totalDeposit: bp.bp_totalDeposit - agg.totalDeposit };
 
   const daysElapsed = Math.max(1, Math.round((range.to - range.from) / dayMs) + 1);
   const daysInPeriod = Math.round((fullRange.to - fullRange.from) / dayMs) + 1;
 
-  const sections = buildTiles(agg, m1, { ggr: bp.bp_ggr }, { daysElapsed, daysInPeriod });
+  const sections = buildTiles(agg, m1, bp, d1, btg, { daysElapsed, daysInPeriod });
 
   // Sales hero (first section)
-  const sales = sections[0];
-  const salesGgr = sales.kpis[0];
-  const trendGgr = sales.kpis[1];
-  const bpGgr = sales.kpis[2];
-  const gap = sales.kpis[3];
+  const sales    = sections[0];
+  const salesGgr = sales.kpis[0]; // MTD GGR
+  const trendGgr = sales.kpis[1]; // Trend GGR
+  const bpGgr    = sales.kpis[2]; // BP full month GGR
+  const gap      = sales.kpis[3]; // Gap vs BP MTD
+  const btgGgr   = sales.kpis[4]; // BTG GGR
   const ating = bpGgr.atual ? salesGgr.atual / bpGgr.atual : 0;
-  const heroColor = farolColor(ating);
-  const sign = gap.atual >= 0 ? '+' : '';
+  const sign  = gap.atual >= 0 ? '+' : '';
 
   let html = `
     <div class="sales-hero">
       <div class="hero-main">
         <div class="hero-label">${salesGgr.name}</div>
         <div class="hero-value">${fmtKpi(salesGgr.atual, 'brl')}</div>
-        <div class="hero-sub ${gap.atual >= 0 ? 'positive' : 'negative'}">${sign}${fmtKpi(gap.atual, 'brl')} vs BP (${(ating * 100).toFixed(1)}%)</div>
+        <div class="hero-sub ${gap.atual >= 0 ? 'positive' : 'negative'}">${sign}${fmtKpi(gap.atual, 'brl')} vs BP MTD (${(ating * 100).toFixed(1)}%)</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-label">BP GGR (mês)</div>
+        <div class="v">${fmtKpi(bpGgr.atual, 'brl')}</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-label">BTG R$ GGR</div>
+        <div class="v" style="color: var(--${btgGgr.atual <= 0 ? 'positive' : 'negative'})">${fmtKpi(btgGgr.atual, 'brl')}</div>
       </div>
       <div class="hero-stat">
         <div class="hero-label">Trend GGR</div>
         <div class="v">${fmtKpi(trendGgr.atual, 'brl')}</div>
-      </div>
-      <div class="hero-stat">
-        <div class="hero-label">BP GGR (período)</div>
-        <div class="v">${fmtKpi(bpGgr.atual, 'brl')}</div>
-      </div>
-      <div class="hero-stat">
-        <div class="hero-label">Gap / Upside</div>
-        <div class="v" style="color: var(--${gap.atual >= 0 ? 'positive' : 'negative'})">${sign}${fmtKpi(gap.atual, 'brl')}</div>
       </div>
     </div>
   `;
@@ -308,6 +314,9 @@ function renderDynamicFarol() {
       const at = k.orcado != null && k.orcado !== 0 ? k.atual / k.orcado : null;
       const color = farolColor(at);
       const atTxt = at !== null ? (at * 100).toFixed(1) + '%' : '—';
+      const btgRow = k.btg != null
+        ? `<div class="meta"><span>BTG <b>${fmtKpi(k.btg, k.type)}</b></span></div>`
+        : '';
       return `
         <div class="farol-tile ${color}">
           <div class="name">${k.name}</div>
@@ -316,6 +325,7 @@ function renderDynamicFarol() {
             <span>Orçado <b>${fmtKpi(k.orcado, k.type)}</b></span>
             <span>M-1 <b>${fmtKpi(k.m1, k.type)}</b></span>
           </div>
+          ${btgRow}
           <div class="ating"><span class="dot"></span>${atTxt} atingimento</div>
         </div>
       `;
