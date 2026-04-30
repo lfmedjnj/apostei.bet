@@ -397,22 +397,27 @@ async function loadGSheet(url) {
 
   let csvText = null;
   let lastErr = null;
+  let allForbidden = true;
   for (const csvUrl of endpoints) {
     try {
-      const resp = await fetch(csvUrl);
+      // omit credentials so Google treats this as anonymous (avoids 403 on public sheets from file://)
+      const resp = await fetch(csvUrl, { credentials: 'omit' });
       if (!resp.ok) {
-        if (resp.status === 401 || resp.status === 403) {
-          throw new Error('Sheet privado — habilite "Anyone with the link" em Compartilhar');
-        }
+        if (resp.status !== 401 && resp.status !== 403) allForbidden = false;
         lastErr = new Error(`HTTP ${resp.status}`); continue;
       }
+      allForbidden = false;
       csvText = await resp.text();
       if (csvText && csvText.length > 50) break;
     } catch (e) {
+      allForbidden = false;
       lastErr = e;
     }
   }
-  if (!csvText) throw lastErr || new Error('Falha ao buscar a sheet');
+  if (!csvText) {
+    if (allForbidden) throw new Error('Sheet privado — habilite "Anyone with the link" em Compartilhar');
+    throw lastErr || new Error('Falha ao buscar a sheet');
+  }
 
   const wb = XLSX.read(csvText, { type: 'string', raw: false });
   applyRows(parseDbWorkbook(wb), 'Google Sheets');
