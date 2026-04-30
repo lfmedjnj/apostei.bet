@@ -116,6 +116,10 @@ function parseDbWorkbook(wb) {
       if (colIdx[currentGroup]) colIdx[currentGroup][key] = c;
     }
     dataStart = 2;
+    // DEBUG — remove once column mapping is confirmed
+    console.log('[FAROL] sheet headers row0:', JSON.stringify((aoa[0]||[]).slice(0,30)));
+    console.log('[FAROL] sheet headers row1:', JSON.stringify((aoa[1]||[]).slice(0,30)));
+    console.log('[FAROL] colIdx mapped:', JSON.stringify(colIdx));
   }
 
   const dateCol = colIdx.criteria.date;
