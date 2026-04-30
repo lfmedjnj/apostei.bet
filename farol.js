@@ -3,6 +3,9 @@
 
 const GSHEET_URL = 'https://docs.google.com/spreadsheets/d/18LJBQ2QxigGl67_tdABQ5NXPC3zRS7zwbAFWu7VhSw4/edit?gid=1852662426';
 
+// Set this to your deployed Apps Script web app URL after deploying Code.gs
+const APPS_SCRIPT_URL = '';
+
 const FAROL_STATE = {
   rows: [],          // parsed DB rows
   asOfDate: null,    // current "D-1" date
@@ -423,6 +426,18 @@ async function loadGSheet(url) {
   applyRows(parseDbWorkbook(wb), 'Google Sheets');
 }
 
+// Loads CSV via Apps Script web app (no CORS, no auth) — preferred path
+async function loadFromAppsScript() {
+  if (!APPS_SCRIPT_URL) throw new Error('APPS_SCRIPT_URL não configurado');
+  setStatus('Carregando Google Sheets...');
+  const resp = await fetch(APPS_SCRIPT_URL);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const csvText = await resp.text();
+  if (!csvText || csvText.startsWith('ERROR:')) throw new Error(csvText || 'Resposta vazia');
+  const wb = XLSX.read(csvText, { type: 'string', raw: false });
+  applyRows(parseDbWorkbook(wb), 'Google Sheets (live)');
+}
+
 // Loads the CSV synced by GitHub Actions from the same origin (zero CORS)
 async function loadFromRepo() {
   setStatus('Sincronizando dados...');
@@ -432,6 +447,20 @@ async function loadFromRepo() {
     const csvText = await resp.text();
     const wb = XLSX.read(csvText, { type: 'string', raw: false });
     applyRows(parseDbWorkbook(wb), 'Google Sheets (auto-sync)');
+  } catch (err) {
+    setStatus(`Erro: ${err.message}`, 'error');
+    console.error(err);
+  }
+}
+
+// Main load — uses Apps Script if configured, otherwise falls back to repo CSV
+async function loadData() {
+  try {
+    if (APPS_SCRIPT_URL) {
+      await loadFromAppsScript();
+    } else {
+      await loadFromRepo();
+    }
   } catch (err) {
     setStatus(`Erro: ${err.message}`, 'error');
     console.error(err);
@@ -458,7 +487,7 @@ function initFarol() {
   });
 
   const refreshBtn = document.getElementById('refresh-btn');
-  if (refreshBtn) refreshBtn.addEventListener('click', loadFromRepo);
+  if (refreshBtn) refreshBtn.addEventListener('click', loadData);
 
   // Auto-load on first Tab 2 open
   let autoLoaded = false;
@@ -467,13 +496,13 @@ function initFarol() {
     tab2Btn.addEventListener('click', () => {
       if (autoLoaded || FAROL_STATE.rows.length) return;
       autoLoaded = true;
-      loadFromRepo();
+      loadData();
     });
   }
 
-  // Auto-refresh every 5 minutes (CSV is synced every 10 min by GitHub Actions)
+  // Auto-refresh every 5 minutes
   setInterval(() => {
-    if (FAROL_STATE.rows.length) loadFromRepo();
+    if (FAROL_STATE.rows.length) loadData();
   }, 5 * 60 * 1000);
 }
 
