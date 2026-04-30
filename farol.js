@@ -18,7 +18,11 @@ const FAROL_STATE = {
 const COL_MAP = {
   'Date': 'date',
   'Invest. Aquisição': 'invest',
+  'Investimento Growth': 'invest',
+  'Investimento Aquisição': 'invest',
+  'Investimento': 'invest',
   'FTD amount': 'ftdAmount',
+  'FTD Amount': 'ftdAmount',
   'FTD #': 'ftdCount',
   'Total Deposit': 'totalDeposit',
   'DEP M0': 'depM0',
