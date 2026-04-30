@@ -458,7 +458,7 @@ function initFarol() {
   });
 
   const refreshBtn = document.getElementById('refresh-btn');
-  if (refreshBtn) refreshBtn.addEventListener('click', () => loadGSheet(GSHEET_URL).catch((err) => setStatus(`Erro: ${err.message}`, 'error')));
+  if (refreshBtn) refreshBtn.addEventListener('click', loadFromRepo);
 
   // Auto-load on first Tab 2 open
   let autoLoaded = false;
@@ -467,13 +467,13 @@ function initFarol() {
     tab2Btn.addEventListener('click', () => {
       if (autoLoaded || FAROL_STATE.rows.length) return;
       autoLoaded = true;
-      loadGSheet(GSHEET_URL).catch((err) => setStatus(`Erro: ${err.message}`, 'error'));
+      loadFromRepo();
     });
   }
 
-  // Auto-refresh every 5 minutes
+  // Auto-refresh every 5 minutes (CSV is synced every 10 min by GitHub Actions)
   setInterval(() => {
-    if (FAROL_STATE.rows.length) loadGSheet(GSHEET_URL).catch(() => {});
+    if (FAROL_STATE.rows.length) loadFromRepo();
   }, 5 * 60 * 1000);
 }
 
