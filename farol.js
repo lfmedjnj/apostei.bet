@@ -1,6 +1,8 @@
 // ===== FAROL ENGINE =====
 // Loads Theorical DB from XLSX upload, aggregates by period, renders KPI tiles.
 
+const GSHEET_URL = 'https://docs.google.com/spreadsheets/d/18LJBQ2QxigGl67_tdABQ5NXPC3zRS7zwbAFWu7VhSw4/edit?gid=1852662426';
+
 const FAROL_STATE = {
   rows: [],          // parsed DB rows
   asOfDate: null,    // current "D-1" date
@@ -451,7 +453,7 @@ function initFarol() {
   });
 
   const refreshBtn = document.getElementById('refresh-btn');
-  if (refreshBtn) refreshBtn.addEventListener('click', loadFromRepo);
+  if (refreshBtn) refreshBtn.addEventListener('click', () => loadGSheet(GSHEET_URL).catch((err) => setStatus(`Erro: ${err.message}`, 'error')));
 
   // Auto-load on first Tab 2 open
   let autoLoaded = false;
@@ -460,9 +462,14 @@ function initFarol() {
     tab2Btn.addEventListener('click', () => {
       if (autoLoaded || FAROL_STATE.rows.length) return;
       autoLoaded = true;
-      loadFromRepo();
+      loadGSheet(GSHEET_URL).catch((err) => setStatus(`Erro: ${err.message}`, 'error'));
     });
   }
+
+  // Auto-refresh every 5 minutes
+  setInterval(() => {
+    if (FAROL_STATE.rows.length) loadGSheet(GSHEET_URL).catch(() => {});
+  }, 5 * 60 * 1000);
 }
 
 document.addEventListener('DOMContentLoaded', initFarol);
