@@ -4,7 +4,7 @@
 const GSHEET_URL = 'https://docs.google.com/spreadsheets/d/18LJBQ2QxigGl67_tdABQ5NXPC3zRS7zwbAFWu7VhSw4/edit?gid=1852662426';
 
 // Set this to your deployed Apps Script web app URL after deploying Code.gs
-const APPS_SCRIPT_URL = '';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbygfj-b_GpRpMYHDSANOXXSD81iRN4NebA5R9wIxSsvHSbJnthpQA3XvotRY-uzsMEZaA/exec';
 
 const FAROL_STATE = {
   rows: [],          // parsed DB rows
